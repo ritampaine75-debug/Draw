@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Viewer</title>
+    <style>
+        body { margin: 0; padding: 0; background: #222; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        h2 { margin-bottom: 10px; letter-spacing: 2px; text-transform: uppercase; }
+        
+        canvas {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            max-width: 100%;
+        }
+        #status { color: #aaa; font-size: 0.9rem; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>🔴 Live Feed</h2>
+    <canvas id="viewCanvas" width="800" height="600"></canvas>
+    <div id="status">Waiting for artist...</div>
+
+    <script type="module">
+        // Import Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onChildAdded, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // YOUR CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyCS8jC7EMA9qg84LF0qaqunhO0NRzhkp9c",
+            authDomain: "games-7-98b09.firebaseapp.com",
+            databaseURL: "https://games-7-98b09-default-rtdb.firebaseio.com",
+            projectId: "games-7-98b09",
+            storageBucket: "games-7-98b09.firebasestorage.app",
+            messagingSenderId: "686134480926",
+            appId: "1:686134480926:web:ac0b6814d4674766d65e0f"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const boardRef = ref(db, 'live_board/drawing');
+
+        const canvas = document.getElementById('viewCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+
+        // 1. নতুন আঁকা আসলে সেটা আঁকুন
+        onChildAdded(boardRef, (snapshot) => {
+            statusDiv.textContent = "Receiving data...";
+            const data = snapshot.val();
+            const points = data.points;
+
+            if (!points || points.length < 1) return;
+
+            ctx.beginPath();
+            ctx.strokeStyle = data.color;
+            ctx.lineWidth = 5;
+            ctx.lineCap = "round";
+
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.stroke();
+            
+            setTimeout(() => statusDiv.textContent = "Live", 500);
+        });
+
+        // 2. বোর্ড ক্লিয়ার করলে এটাও ক্লিয়ার হবে
+        onValue(boardRef, (snapshot) => {
+            if (!snapshot.exists()) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                statusDiv.textContent = "Board Cleared";
+            }
+        });
+
+    </script>
+</body>
+</html>

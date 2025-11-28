@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Artist Board (Draw Here)</title>
+    <style>
+        body { margin: 0; padding: 0; background: #f0f0f0; font-family: sans-serif; overflow: hidden; }
+        .header { padding: 10px; text-align: center; background: #333; color: white; }
+        
+        /* Canvas Styling */
+        .canvas-container {
+            display: flex; justify-content: center; align-items: center; height: 80vh;
+        }
+        canvas {
+            background: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            cursor: crosshair;
+            touch-action: none; /* Mobile e scroll bondho korar jonne */
+        }
+
+        /* Tools Styling */
+        .tools {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: white; padding: 10px 20px; border-radius: 50px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2); display: flex; gap: 10px;
+        }
+        .color-btn { width: 35px; height: 35px; border-radius: 50%; border: 2px solid #ddd; cursor: pointer; }
+        .btn-clear { padding: 8px 15px; border: none; background: #ff4444; color: white; border-radius: 20px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="header">🎨 Artist Zone - Draw Here</div>
+
+    <div class="canvas-container">
+        <canvas id="drawCanvas" width="800" height="600"></canvas>
+    </div>
+
+    <div class="tools">
+        <button class="color-btn" style="background: black;" onclick="setColor('#000000')"></button>
+        <button class="color-btn" style="background: red;" onclick="setColor('#ef4444')"></button>
+        <button class="color-btn" style="background: blue;" onclick="setColor('#3b82f6')"></button>
+        <button class="color-btn" style="background: green;" onclick="setColor('#10b981')"></button>
+        <button class="btn-clear" onclick="clearBoard()">Clear</button>
+    </div>
+
+    <script type="module">
+        // Import Firebase from CDN (Browser Friendly)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, push, set, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // YOUR CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyCS8jC7EMA9qg84LF0qaqunhO0NRzhkp9c",
+            authDomain: "games-7-98b09.firebaseapp.com",
+            databaseURL: "https://games-7-98b09-default-rtdb.firebaseio.com",
+            projectId: "games-7-98b09",
+            storageBucket: "games-7-98b09.firebasestorage.app",
+            messagingSenderId: "686134480926",
+            appId: "1:686134480926:web:ac0b6814d4674766d65e0f"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        
+        // Database Reference
+        const boardRef = ref(db, 'live_board/drawing');
+
+        // Canvas Setup
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let isDrawing = false;
+        let currentColor = "#000000";
+        let currentPath = [];
+
+        // --- DRAWING FUNCTIONS ---
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            // Touch or Mouse check
+            const x = e.touches ? e.touches[0].clientX : e.clientX;
+            const y = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            // Scaling logic for responsiveness
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            return { x: (x - rect.left) * scaleX, y: (y - rect.top) * scaleY };
+        }
+
+        function start(e) {
+            isDrawing = true;
+            currentPath = []; // Start new line
+            const pos = getPos(e);
+            currentPath.push(pos);
+            e.preventDefault(); // Stop scrolling
+        }
+
+        function move(e) {
+            if (!isDrawing) return;
+            const pos = getPos(e);
+            const last = currentPath[currentPath.length - 1];
+
+            // Draw locally immediately (No lag for artist)
+            ctx.beginPath();
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = 5;
+            ctx.lineCap = "round";
+            ctx.moveTo(last.x, last.y);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+
+            currentPath.push(pos);
+            e.preventDefault();
+        }
+
+        function end() {
+            if (!isDrawing) return;
+            isDrawing = false;
+
+            // Send the FULL STROKE to Firebase
+            if (currentPath.length > 1) {
+                push(boardRef, {
+                    color: currentColor,
+                    points: currentPath
+                });
+            }
+        }
+
+        // --- EVENTS ---
+        canvas.addEventListener('mousedown', start);
+        canvas.addEventListener('mousemove', move);
+        canvas.addEventListener('mouseup', end);
+        
+        // Mobile Support
+        canvas.addEventListener('touchstart', start, {passive: false});
+        canvas.addEventListener('touchmove', move, {passive: false});
+        canvas.addEventListener('touchend', end);
+
+        // --- TOOLS ---
+        window.setColor = (c) => currentColor = c;
+        window.clearBoard = () => {
+            remove(boardRef); // Database Theke delete koro
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Screen clear koro
+        };
+    </script>
+</body>
+</html>
